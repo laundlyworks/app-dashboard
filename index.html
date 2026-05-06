@@ -58,12 +58,67 @@
   .sort-controls select { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; }
   .legend { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
   .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--muted); }
+
+  /* Version Graph Section */
+  .version-section { margin: 24px 0; }
+  .version-section h2 { font-size: 1.1rem; margin-bottom: 12px; }
+  .version-graph { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; overflow-x: auto; }
+  .version-graph-inner { position: relative; min-height: 200px; }
+  .version-graph svg { width: 100%; height: 200px; }
+  .version-graph .axis-label { font-size: 0.65rem; fill: var(--muted); }
+  .version-graph .grid-line { stroke: var(--border); stroke-width: 0.5; }
+  .version-graph .data-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .version-graph .data-dot { cursor: pointer; transition: r 0.15s; }
+  .version-graph .data-dot:hover { r: 6; }
+  .version-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+  .version-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--muted); cursor: pointer; transition: opacity 0.2s; }
+  .version-legend-item:hover { opacity: 0.7; }
+  .version-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* Detail Button */
+  .detail-btn { background: none; border: 1px solid var(--border); color: var(--accent); padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+  .detail-btn:hover { background: var(--accent); color: #fff; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; max-width: 680px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 24px; position: relative; }
+  .modal-close { position: absolute; top: 12px; right: 16px; background: none; border: none; color: var(--muted); font-size: 1.4rem; cursor: pointer; line-height: 1; }
+  .modal-close:hover { color: var(--text); }
+  .modal h2 { font-size: 1.2rem; margin-bottom: 4px; color: var(--accent); }
+  .modal .modal-version { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
+  .modal .changelog { border-top: 1px solid var(--border); padding-top: 16px; }
+  .changelog-entry { margin-bottom: 16px; }
+  .changelog-entry h3 { font-size: 0.95rem; color: var(--text); margin-bottom: 6px; }
+  .changelog-entry h3 .entry-ver { color: var(--accent); }
+  .changelog-entry h3 .entry-date { color: var(--muted); font-weight: 400; font-size: 0.8rem; }
+  .changelog-entry ul { list-style: none; padding: 0; }
+  .changelog-entry li { font-size: 0.8rem; color: var(--muted); padding: 2px 0; padding-left: 16px; position: relative; }
+  .changelog-entry li::before { content: ''; position: absolute; left: 0; top: 9px; width: 6px; height: 6px; border-radius: 50%; }
+  .changelog-entry li.cat-added::before { background: var(--green); }
+  .changelog-entry li.cat-changed::before { background: var(--yellow); }
+  .changelog-entry li.cat-fixed::before { background: var(--purple); }
+  .changelog-entry li.cat-removed::before { background: var(--red); }
+  .changelog-entry li.cat-deprecated::before { background: var(--muted); }
+  .changelog-entry li.cat-security::before { background: #f0883e; }
+  .changelog-entry li.cat-other::before { background: var(--border); }
+
+  /* Loading indicator */
+  .loading-indicator { color: var(--muted); font-size: 0.8rem; display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .loading-spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* No changelog message */
+  .no-changelog { color: var(--muted); font-size: 0.8rem; font-style: italic; padding: 12px 0; }
+
+  /* Graph tooltip */
+  .graph-tooltip { position: absolute; background: #000; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 0.75rem; pointer-events: none; z-index: 50; white-space: nowrap; display: none; }
 </style>
 </head>
 <body>
 
 <h1>dev-apps Dashboard</h1>
-<p class="subtitle">全アプリのアップデート状況 &mdash; 最終更新: 2026-04-13</p>
+<p class="subtitle">全アプリのアップデート状況 &mdash; 最終更新: <span id="last-updated">-</span></p>
 
 <div class="stats-bar" id="stats"></div>
 
@@ -80,6 +135,19 @@
   <div class="timeline-labels" id="timeline-labels"></div>
 </div>
 
+<div class="version-section">
+  <h2>Version History (バージョン推移)</h2>
+  <div id="version-loading" class="loading-indicator" style="display:none;"><div class="loading-spinner"></div>README.md からバージョン情報を取得中...</div>
+  <div class="version-graph" id="version-graph-container" style="display:none;">
+    <div class="version-graph-inner">
+      <svg id="version-svg"></svg>
+      <div class="graph-tooltip" id="graph-tooltip"></div>
+    </div>
+    <div class="version-legend" id="version-legend"></div>
+  </div>
+  <div id="version-no-data" class="no-changelog" style="display:none;">バージョン情報が見つかりません。各レポジトリのREADME.mdにバージョンセクションを追加してください。</div>
+</div>
+
 <input type="text" class="search" id="search" placeholder="アプリ名で検索...">
 <div class="filters" id="filters"></div>
 <div class="sort-controls">
@@ -92,6 +160,16 @@
 </div>
 
 <div class="grid" id="grid"></div>
+
+<!-- Changelog Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modal-close">&times;</button>
+    <h2 id="modal-title"></h2>
+    <div class="modal-version" id="modal-version"></div>
+    <div class="changelog" id="modal-changelog"></div>
+  </div>
+</div>
 
 <script>
 const apps = [
@@ -133,8 +211,98 @@ const apps = [
   {name:"nishiawakura_digital",cat:"gatsby-apps",ver:null,remote:null,commits:[{h:"b432589",d:"2023-04-16",m:"20230416_"}]}
 ];
 
-const NOW = new Date('2026-04-13');
+const NOW = new Date();
+document.getElementById('last-updated').textContent = NOW.toISOString().split('T')[0];
 
+// ===== README.md Fetcher =====
+// Fetches README.md from GitHub API and parses version + changelog
+const readmeCache = {};
+
+function extractOwnerRepo(remoteUrl) {
+  if (!remoteUrl) return null;
+  const m = remoteUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+  return m ? { owner: m[1], repo: m[2] } : null;
+}
+
+function parseReadmeVersion(content) {
+  // Match: ## Version\nCurrent: X.Y.Z
+  const m = content.match(/##\s*Version\s*\n+\s*Current:\s*([\d.]+)/i);
+  return m ? m[1] : null;
+}
+
+function parseReadmeChangelog(content) {
+  // Extract 更新履歴 section
+  const sectionMatch = content.match(/##\s*更新履歴\s*\n([\s\S]*?)(?=\n##\s[^#]|$)/);
+  if (!sectionMatch) return [];
+
+  const section = sectionMatch[1];
+  const entries = [];
+  const entryRegex = /###\s*\[([^\]]+)\]\s*-\s*(\d{4}-\d{2}-\d{2})\s*\n([\s\S]*?)(?=\n###\s|\s*$)/g;
+  let match;
+  while ((match = entryRegex.exec(section)) !== null) {
+    const ver = match[1];
+    const date = match[2];
+    const body = match[3];
+    const items = [];
+    body.split('\n').forEach(line => {
+      const itemMatch = line.match(/^-\s*(Added|Changed|Fixed|Removed|Deprecated|Security):\s*(.+)/i);
+      if (itemMatch) {
+        items.push({ category: itemMatch[1], text: itemMatch[2].trim() });
+      } else {
+        const plainMatch = line.match(/^-\s+(.+)/);
+        if (plainMatch) {
+          items.push({ category: 'Other', text: plainMatch[1].trim() });
+        }
+      }
+    });
+    entries.push({ version: ver, date, items });
+  }
+  return entries;
+}
+
+// Parse version history (all versions with dates) for graphing
+function parseVersionHistory(changelog) {
+  return changelog.map(e => ({
+    version: e.version,
+    date: e.date,
+    numeric: versionToNumeric(e.version)
+  })).reverse(); // oldest first for graphing
+}
+
+function versionToNumeric(ver) {
+  const parts = ver.split('.').map(Number);
+  // Major * 10000 + Minor * 100 + Patch
+  return (parts[0] || 0) * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0);
+}
+
+function versionToDisplay(ver) {
+  return 'v' + ver;
+}
+
+async function fetchReadme(app) {
+  if (readmeCache[app.name] !== undefined) return readmeCache[app.name];
+  const info = extractOwnerRepo(app.remote);
+  if (!info) { readmeCache[app.name] = null; return null; }
+
+  try {
+    const resp = await fetch(
+      `https://api.github.com/repos/${info.owner}/${info.repo}/readme`,
+      { headers: { 'Accept': 'application/vnd.github.v3.raw' } }
+    );
+    if (!resp.ok) { readmeCache[app.name] = null; return null; }
+    const text = await resp.text();
+    const version = parseReadmeVersion(text);
+    const changelog = parseReadmeChangelog(text);
+    const result = { version, changelog, raw: text };
+    readmeCache[app.name] = result;
+    return result;
+  } catch {
+    readmeCache[app.name] = null;
+    return null;
+  }
+}
+
+// ===== Core Dashboard Functions =====
 function daysSince(dateStr) {
   return Math.floor((NOW - new Date(dateStr)) / 86400000);
 }
@@ -217,6 +385,45 @@ document.getElementById('sort').addEventListener('change', e => {
   render();
 });
 
+// ===== Modal =====
+function openModal(app, readmeData) {
+  const overlay = document.getElementById('modal-overlay');
+  document.getElementById('modal-title').textContent = app.name;
+
+  const displayVer = (readmeData && readmeData.version) || app.ver;
+  document.getElementById('modal-version').textContent = displayVer ? `Current Version: v${displayVer}` : 'バージョン情報なし';
+
+  const changelogEl = document.getElementById('modal-changelog');
+
+  if (readmeData && readmeData.changelog && readmeData.changelog.length > 0) {
+    changelogEl.innerHTML = readmeData.changelog.map(entry => `
+      <div class="changelog-entry">
+        <h3><span class="entry-ver">[${entry.version}]</span> <span class="entry-date">${entry.date}</span></h3>
+        <ul>
+          ${entry.items.map(item => `<li class="cat-${item.category.toLowerCase()}">${item.category}: ${item.text}</li>`).join('')}
+        </ul>
+      </div>
+    `).join('');
+  } else {
+    changelogEl.innerHTML = `<div class="no-changelog">
+      更新履歴がREADME.mdに見つかりません。<br>
+      CLAUDE.md の共通ルールに従い、README.md に「## 更新履歴」セクションを追加してください。
+    </div>`;
+  }
+
+  overlay.classList.add('active');
+}
+
+document.getElementById('modal-close').addEventListener('click', () => {
+  document.getElementById('modal-overlay').classList.remove('active');
+});
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) {
+    document.getElementById('modal-overlay').classList.remove('active');
+  }
+});
+
+// ===== Card Grid =====
 function render() {
   let filtered = apps.filter(a => {
     if (currentCat !== 'all' && a.cat !== currentCat) return false;
@@ -242,10 +449,14 @@ function render() {
     const nameHtml = a.remote
       ? `<a class="app-name" href="${a.remote}" target="_blank">${a.name}</a>`
       : `<span class="app-name no-link">${a.name}</span>`;
-    const verHtml = a.ver ? `<span class="version">v${a.ver}</span>` : '';
+
+    // Use README version if available, fallback to embedded ver
+    const rd = readmeCache[a.name];
+    const displayVer = (rd && rd.version) || a.ver;
+    const verHtml = displayVer ? `<span class="version">v${displayVer}</span>` : '';
     const tagsHtml = a.tags ? `<div class="meta-item">Tags: ${a.tags.slice(0,3).join(', ')}</div>` : '';
 
-    return `<div class="card" data-cat="${a.cat}">
+    return `<div class="card" data-cat="${a.cat}" data-app="${a.name}">
       <div class="card-header">${nameHtml}${verHtml}</div>
       <div class="category">${a.cat}</div>
       <div class="meta">
@@ -260,11 +471,188 @@ function render() {
           <span class="commit-msg">${c.m}</span>
         </div>`).join('')}
       </div>
+      <button class="detail-btn" onclick="handleDetailClick('${a.name}')">詳細・更新履歴を見る</button>
     </div>`;
   }).join('');
 }
 
+async function handleDetailClick(appName) {
+  const app = apps.find(a => a.name === appName);
+  if (!app) return;
+
+  let rd = readmeCache[appName];
+  if (rd === undefined) {
+    rd = await fetchReadme(app);
+  }
+  openModal(app, rd);
+}
+
+// ===== Version History Graph (SVG) =====
+const GRAPH_COLORS = [
+  '#58a6ff', '#3fb950', '#d29922', '#f85149', '#bc8cff',
+  '#f0883e', '#79c0ff', '#56d364', '#e3b341', '#ff7b72',
+  '#d2a8ff', '#ffa657', '#a5d6ff', '#7ee787', '#f2cc60'
+];
+
+async function loadVersionGraph() {
+  const loading = document.getElementById('version-loading');
+  const container = document.getElementById('version-graph-container');
+  const noData = document.getElementById('version-no-data');
+  loading.style.display = 'flex';
+
+  // Fetch READMEs for apps with remote URLs (in parallel, batched)
+  const appsWithRemote = apps.filter(a => a.remote);
+  const batchSize = 5;
+  for (let i = 0; i < appsWithRemote.length; i += batchSize) {
+    const batch = appsWithRemote.slice(i, i + batchSize);
+    await Promise.all(batch.map(a => fetchReadme(a)));
+  }
+
+  // Collect apps that have version history from changelog
+  const graphData = [];
+  for (const app of apps) {
+    const rd = readmeCache[app.name];
+    if (rd && rd.changelog && rd.changelog.length > 0) {
+      const history = parseVersionHistory(rd.changelog);
+      if (history.length > 0) {
+        graphData.push({ name: app.name, history });
+      }
+    }
+  }
+
+  loading.style.display = 'none';
+
+  // Also build graph data from embedded version + commit dates for apps without README changelog
+  // Show apps that have a version (even without changelog) as single points
+  for (const app of apps) {
+    if (graphData.find(g => g.name === app.name)) continue;
+    const displayVer = (readmeCache[app.name] && readmeCache[app.name].version) || app.ver;
+    if (displayVer && app.commits[0]) {
+      graphData.push({
+        name: app.name,
+        history: [{ version: displayVer, date: app.commits[0].d, numeric: versionToNumeric(displayVer) }]
+      });
+    }
+  }
+
+  if (graphData.length === 0) {
+    noData.style.display = 'block';
+    return;
+  }
+
+  container.style.display = 'block';
+  drawVersionGraph(graphData);
+
+  // Re-render cards to pick up fetched README versions
+  render();
+}
+
+function drawVersionGraph(graphData) {
+  const svg = document.getElementById('version-svg');
+  const tooltipEl = document.getElementById('graph-tooltip');
+  const legendEl = document.getElementById('version-legend');
+
+  const W = svg.parentElement.clientWidth;
+  const H = 200;
+  const PAD = { top: 20, right: 30, bottom: 30, left: 60 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+
+  // Collect all dates and numeric versions
+  let allDates = [];
+  let maxNumeric = 0;
+  graphData.forEach(g => {
+    g.history.forEach(h => {
+      allDates.push(new Date(h.date));
+      if (h.numeric > maxNumeric) maxNumeric = h.numeric;
+    });
+  });
+
+  const minDate = new Date(Math.min(...allDates));
+  const maxDate = new Date(Math.max(...allDates));
+  const dateRange = maxDate - minDate || 86400000; // at least 1 day
+  maxNumeric = maxNumeric || 100;
+
+  function xScale(dateStr) {
+    return PAD.left + ((new Date(dateStr) - minDate) / dateRange) * plotW;
+  }
+  function yScale(numeric) {
+    return PAD.top + plotH - (numeric / (maxNumeric * 1.1)) * plotH;
+  }
+
+  let svgContent = '';
+
+  // Grid lines (horizontal)
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + (plotH / 4) * i;
+    const val = maxNumeric * 1.1 * (1 - i / 4);
+    const major = Math.floor(val / 10000);
+    const minor = Math.floor((val % 10000) / 100);
+    const patch = Math.floor(val % 100);
+    svgContent += `<line class="grid-line" x1="${PAD.left}" y1="${y}" x2="${W - PAD.right}" y2="${y}" />`;
+    svgContent += `<text class="axis-label" x="${PAD.left - 8}" y="${y + 4}" text-anchor="end">${major}.${minor}.${patch}</text>`;
+  }
+
+  // Date labels (bottom)
+  const dateSteps = 6;
+  for (let i = 0; i <= dateSteps; i++) {
+    const d = new Date(minDate.getTime() + (dateRange / dateSteps) * i);
+    const x = PAD.left + (plotW / dateSteps) * i;
+    const label = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    svgContent += `<text class="axis-label" x="${x}" y="${H - 6}" text-anchor="middle">${label}</text>`;
+  }
+
+  // Draw lines and dots for each app
+  graphData.forEach((g, idx) => {
+    const color = GRAPH_COLORS[idx % GRAPH_COLORS.length];
+    const points = g.history.map(h => ({ x: xScale(h.date), y: yScale(h.numeric), ver: h.version, date: h.date }));
+
+    if (points.length > 1) {
+      const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+      svgContent += `<path class="data-line" d="${pathD}" stroke="${color}" />`;
+    }
+
+    points.forEach(p => {
+      svgContent += `<circle class="data-dot" cx="${p.x}" cy="${p.y}" r="4" fill="${color}"
+        data-app="${g.name}" data-ver="${p.ver}" data-date="${p.date}"
+        onmouseenter="showGraphTooltip(event, '${g.name}', 'v${p.ver}', '${p.date}')"
+        onmouseleave="hideGraphTooltip()" />`;
+    });
+  });
+
+  svg.innerHTML = svgContent;
+
+  // Legend
+  legendEl.innerHTML = graphData.map((g, idx) => {
+    const color = GRAPH_COLORS[idx % GRAPH_COLORS.length];
+    const latestVer = g.history[g.history.length - 1].version;
+    return `<div class="version-legend-item" onclick="handleDetailClick('${g.name}')">
+      <div class="version-legend-dot" style="background:${color}"></div>
+      ${g.name} (v${latestVer})
+    </div>`;
+  }).join('');
+}
+
+function showGraphTooltip(event, appName, ver, date) {
+  const tooltip = document.getElementById('graph-tooltip');
+  const rect = document.getElementById('version-graph-container').getBoundingClientRect();
+  tooltip.textContent = `${appName} ${ver} (${date})`;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (event.clientX - rect.left + 12) + 'px';
+  tooltip.style.top = (event.clientY - rect.top - 30) + 'px';
+}
+
+function hideGraphTooltip() {
+  document.getElementById('graph-tooltip').style.display = 'none';
+}
+
+// ===== Initialize =====
 render();
+loadVersionGraph();
 </script>
 </body>
 </html>
